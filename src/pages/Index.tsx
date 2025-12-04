@@ -30,11 +30,11 @@ const Index = () => {
   }
 
   const phase = examStatus?.phase ?? 0;
-  const phaseLabel = examStatus?.phaseLabel;
-  const examDate = examStatus?.examDate ?? new Date().toISOString();
+  const phaseLabel = examStatus?.phase_label;
+  const examDate = examStatus?.exam_date ?? new Date().toISOString();
   const announcement = examStatus?.announcement ?? '';
-  const questionPaperURL = examStatus?.questionPaperURL;
-  const resultsURL = examStatus?.resultsURL;
+  const questionPaperURL = examStatus?.question_paper_url;
+  const resultsURL = examStatus?.results_url;
 
   return (
     <div className="min-h-screen flex flex-col">
