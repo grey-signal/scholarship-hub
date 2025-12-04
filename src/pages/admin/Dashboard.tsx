@@ -1,8 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,10 +13,11 @@ import { useAdminActions } from '@/hooks/useAdminActions';
 import UploadPDF from '@/components/UploadPDF';
 import PhaseChip from '@/components/PhaseChip';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 
 const AdminDashboard = () => {
-  const [user, authLoading] = useAuthState(auth);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const navigate = useNavigate();
   const { examStatus, loading: statusLoading } = useExamStatus();
   const { updateExamStatus } = useAdminActions();
@@ -31,24 +30,42 @@ const AdminDashboard = () => {
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/admin/login');
-    }
-  }, [user, authLoading, navigate]);
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/admin/login');
+      } else {
+        setUser(session.user);
+      }
+      setAuthLoading(false);
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate('/admin/login');
+      } else {
+        setUser(session.user);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   useEffect(() => {
     if (examStatus) {
       setPhase(examStatus.phase);
-      setPhaseLabel(examStatus.phaseLabel || '');
-      setExamDate(examStatus.examDate?.split('T')[0] || '');
+      setPhaseLabel(examStatus.phase_label || '');
+      setExamDate(examStatus.exam_date?.split('T')[0] || '');
       setAnnouncement(examStatus.announcement || '');
-      setResultsURL(examStatus.resultsURL || '');
+      setResultsURL(examStatus.results_url || '');
     }
   }, [examStatus]);
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
       toast.success('Logged out successfully');
       navigate('/admin/login');
     } catch (error) {
@@ -62,10 +79,10 @@ const AdminDashboard = () => {
     try {
       await updateExamStatus({
         phase,
-        phaseLabel: phaseLabel || undefined,
-        examDate: examDate ? new Date(examDate).toISOString() : examStatus?.examDate,
+        phase_label: phaseLabel || null,
+        exam_date: examDate ? new Date(examDate).toISOString() : examStatus?.exam_date,
         announcement,
-        resultsURL: resultsURL || undefined,
+        results_url: resultsURL || null,
       });
     } catch (error) {
       console.error('Update error:', error);
@@ -115,7 +132,7 @@ const AdminDashboard = () => {
               <CardDescription>Overview of the current exam phase</CardDescription>
             </CardHeader>
             <CardContent>
-              <PhaseChip phase={examStatus?.phase ?? 0} label={examStatus?.phaseLabel} />
+              <PhaseChip phase={examStatus?.phase ?? 0} label={examStatus?.phase_label} />
             </CardContent>
           </Card>
 
@@ -211,8 +228,8 @@ const AdminDashboard = () => {
 
           {/* PDF Uploads */}
           <div className="grid md:grid-cols-2 gap-6">
-            <UploadPDF type="question" currentURL={examStatus?.questionPaperURL} />
-            <UploadPDF type="result" currentURL={examStatus?.resultsURL} />
+            <UploadPDF type="question" currentURL={examStatus?.question_paper_url} />
+            <UploadPDF type="result" currentURL={examStatus?.results_url} />
           </div>
         </div>
       </main>
